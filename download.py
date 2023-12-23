@@ -1,26 +1,52 @@
 import re
+import asyncio
+import requests
+from pytube import YouTube
 from yt_dlp import YoutubeDL
 from moviepy.editor import VideoFileClip
-from pytube import YouTube
 
-import requests
-import asyncio
+progress_message = None
+last_message_text = None
 
 async def download(update, context):
     url = context.user_data['url']
     format = context.user_data['format']
-    # Use the function
+
     thumbnail_picture = download_thumbnail(url)
     author = get_author(url)
 
-
     def my_hook(d):
-        asyncio.get_event_loop().create_task(context.bot.send_message(chat_id=context.user_data.get('chat_id'),
-                                 text="dsafdfa"))
-       
+        global progress_message
+        global last_message_text
+        progress_text = "Завантаження..."
+        
 
-    with YoutubeDL({'format': 'best', 
-                    'progress_hooks': [my_hook]}) as ydl:
+        if d['status'] == 'downloading':
+            percent_str = re.sub(r'\x1b\[[0-9;]*m', '', d['_percent_str'])
+            if percent_str == '100.0%':
+                progress_text = "Надсилання..."
+            else:
+                progress_text = f"Завантажено: {percent_str}"
+
+        if not progress_message or last_message_text != progress_text:
+            if progress_message:
+                progress_message = progress_text
+            else:
+                progress_message = asyncio.get_event_loop().create_task(update.callback_query.edit_message_text(text=progress_text))
+            last_message_text = progress_text
+
+
+        # if d['status'] == 'downloading':
+        #     asyncio.get_event_loop().create_task(context.bot.send_message(chat_id=context.user_data.get('chat_id'),
+        #                             text="downloading..."))
+        # elif d['status'] == 'd':
+        #     pass
+        # else:
+        #     asyncio.get_event_loop().create_task(context.bot.send_message(chat_id=context.user_data.get('chat_id'),
+        #                             text="Зараз буде"))
+        
+    await update.callback_query.edit_message_text(text="Знайшов, завантажую...")
+    with YoutubeDL() as ydl:
         info_dict = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info_dict)
         print(format)
