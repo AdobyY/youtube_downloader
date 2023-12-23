@@ -32,6 +32,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Parses the CallbackQuery and updates the message text."""
     await update.callback_query.answer()
+
+    await update.callback_query.edit_message_text(text="Надсилання...")
+    
     
     context.user_data['chat_id'] = update.effective_chat.id
     context.user_data['format'] = update.callback_query.data
@@ -42,10 +45,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data['url'] = context.user_data.get('url')
 
     # Збереження даних про користувача та посилання в JSON-файл
-    save_user_data(context.user_data)
-    
+    await save_user_data(context.user_data)
+    await context.bot.send_message(chat_id=context.user_data.get('chat_id'),
+                                 text="percent")
  
-    file_path, author, thumbnail = await download(context.user_data['url'], context.user_data['format'], context)
+    file_path, author, thumbnail = await download(update, context)
     if file_path:
         await send_file(file_path, author, thumbnail, update)            
     else:
