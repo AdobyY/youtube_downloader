@@ -1,37 +1,37 @@
+import logging
+from urllib.parse import urlparse
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import filters, Application,CallbackContext, CallbackQueryHandler, MessageHandler, CommandHandler, ContextTypes
 import os
 import re
 import json
 import time
-from urllib.parse import urlparse
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters
-from telegram import Bot, InputFile
-from dotenv import load_dotenv
-import logging
 from download import download
-import time
 from datetime import datetime
-
-# Load environment variables from .env file
+from telegram import InputFile
+from dotenv import load_dotenv
 load_dotenv()
+TOKEN = os.getenv('TEST_TOKEN')
 
-# Set logging level
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Enable logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+# set higher logging level for httpx to avoid all GET and POST requests being logged
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
-# Get the token from environment variable
-TOKEN = os.getenv('TOKEN')
+logger = logging.getLogger(__name__)
 
-# Create a bot instance
-bot = Bot(token=TOKEN)
 
-progress_message = None
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("Надішліть своє посилання")
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Будь ласка, надішліть посилання.')
 
-def button(update: Update, context: CallbackContext) -> None:
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Parses the CallbackQuery and updates the message text."""
     query = update.callback_query
-    query.answer()
+    await query.answer()
     context.user_data['chat_id'] = update.effective_chat.id
     context.user_data['format'] = query.data
     context.user_data['timestamp'] = datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
@@ -43,77 +43,15 @@ def button(update: Update, context: CallbackContext) -> None:
     # Збереження даних про користувача та посилання в JSON-файл
     save_user_data(context.user_data)
 
-    file_path, author = download(context.user_data['url'], context.user_data['format'], context)
-    print(author)
+    file_path, author, thumbnail = await download(context.user_data['url'], context.user_data['format'], context)
     if file_path:
-        send_file(context.user_data['chat_id'], file_path, author)
-
-        # Close the file before attempting to delete it
-        with open(file_path, 'rb') as file:
-            file.close()
-
-        # Видалення файлу після відправлення
-        os.remove(file_path)
-        print(f"File removed: {file_path}")
-
-        video_filename = file_path.rsplit(".", 1)[0] + ".mp4"
-        with open(video_filename, 'rb') as file:
-            file.close()
-        if os.path.exists(video_filename):
-            os.remove(video_filename)
-
-        # remove photo
-        photo_filename = file_path.rsplit(".", 1)[0] + ".jpg"
-        clean_photo_filename = re.sub(r'\s*\[.*?\]', '', photo_filename)
-        with open(clean_photo_filename, 'rb') as file:
-            file.close()
-        if os.path.exists(clean_photo_filename):
-            os.remove(clean_photo_filename)
-            
+        await send_file(file_path, author, thumbnail, update)            
     else:
-        update.message.reply_text('Невірне посилання. Будь ласка, надішліть коректне посилання.')
-
-def get_url(update: Update, context: CallbackContext) -> None:
-    url = update.message.text
-    context.user_data['url'] = url
-
-    # Перевірка правильності URL
-    parsed_url = urlparse(url)
-    if parsed_url.scheme and parsed_url.netloc:
-        keyboard = [
-            [InlineKeyboardButton("Відео", callback_data='mp4'),
-             InlineKeyboardButton("Аудіо", callback_data='mp3')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.message.reply_text('Будь ласка, виберіть формат:', reply_markup=reply_markup)
-    else:
-        update.message.reply_text('Невірне посилання. Будь ласка, надішліть коректне посилання.')
-
-def send_file(chat_id, file_path, author):
-    clean_filename = re.sub(r'\s*\[.*?\]', '', file_path)
-    photo_name = clean_filename.rsplit(".", 1)[0] + ".jpg"
-    file_extension = clean_filename[-3:]
-
-    if(file_extension=="mp3"):
-        with open(file_path, 'rb') as file:
-            with open(photo_name, 'rb') as photo:
-                bot.send_audio(chat_id=chat_id, audio=file, title=clean_filename,
-                               filename=clean_filename, thumb=InputFile(photo), performer=author)
-                photo.close()
-            file.close()
-    elif(file_extension=="mp4"):
-        with open(file_path, 'rb') as file:
-            with open(photo_name, 'rb') as photo:
-                bot.send_document(chat_id=chat_id, document=file, filename=clean_filename, thumb=InputFile(photo))
-                photo.close()
-            file.close()
+        await update.message.reply_text('Невірне посилання. Будь ласка, надішліть коректне посилання.')
 
 
-    
-    
-    
 
-def save_user_data(user_data):
+async def save_user_data(user_data):
     # Задайте шлях до файлу JSON
     json_file_path = 'user_data.json'
 
@@ -142,21 +80,72 @@ def save_user_data(user_data):
     with open(json_file_path, 'w') as file:
         json.dump(data, file, indent=2)
 
-def main() -> None:
-    global progress_message
 
-    updater = Updater(bot=bot, use_context=True)
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, get_url))
-    updater.start_polling()
-    updater.idle()
+async def send_file(file_path, author, thumbnail, update):
+    clean_filename = re.sub(r'\s*\[.*?\]', '', file_path)
+    #photo_name = clean_filename.rsplit(".", 1)[0] + ".jpg"
+    video_filename = file_path.rsplit(".", 1)[0] + ".mp4"
+    file_extension = clean_filename[-3:]
+    
+    if(file_extension=="mp3"):
+        with open(file_path, 'rb') as file:
+            with open(thumbnail, 'rb') as photo:
+                await update.callback_query.message.reply_audio(audio=file_path, title=clean_filename,
+                                          thumbnail=thumbnail, performer=author)
+                photo.close()
+            file.close()
 
-    # Зачекайте, поки останнє повідомлення про прогрес не буде відправлено
-    while progress_message is None:
-        time.sleep(1)
-    progress_message.edit_text("Завантаження завершено!")
+        if os.path.exists(video_filename):
+            os.remove(video_filename)
+        if os.path.exists(thumbnail):
+            os.remove(thumbnail)
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
-if __name__ == '__main__':
-    main()
+    elif(file_extension=="mp4"):
+        with open(file_path, 'rb') as file:
+            with open(thumbnail, 'rb') as photo:
+                await update.callback_query.message.reply_video(video=file, filename=clean_filename)
+                photo.close()
+            file.close()
+        
+        if os.path.exists(video_filename):
+            os.remove(video_filename)
+        if os.path.exists(thumbnail):
+            os.remove(thumbnail)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+async def get_url(update: Update, context: CallbackContext) -> None:
+    url = update.message.text
+    context.user_data['url'] = url
+
+    # Перевірка правильності URL
+    parsed_url = urlparse(url)
+    if parsed_url.scheme and parsed_url.netloc:
+        keyboard = [
+            [InlineKeyboardButton("Відео", callback_data='mp4'),
+             InlineKeyboardButton("Аудіо", callback_data='mp3')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text('Будь ласка, виберіть формат:', reply_markup=reply_markup)
+    else:
+        await update.message.reply_text('Невірне посилання. Будь ласка, надішліть коректне посилання.')
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays info on how to use the bot."""
+    await update.message.reply_text("Use /start to test this bot.")
+
+
+
+if __name__ == "__main__":
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, get_url))
+
+    # Run the bot until the user presses Ctrl-C
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
