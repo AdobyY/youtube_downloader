@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import time
 import logging
 from download import download
@@ -64,28 +63,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def save_user_data(user_data):
-    json_file_path = 'user_data.json'
-
-    if not os.path.exists(json_file_path):
-        data = {}
-    else:
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
-
-    user_id = str(user_data['user_id'])
-    if user_id not in data:
-        data[user_id] = []
-
-    data[user_id].append({
-        'timestamp': user_data['timestamp'],
-        'url': user_data['url'],
-        'format': user_data['format'],
-        'user_name': user_data['user_name'],
-        'username': user_data['username']
-    })
-
-    with open(json_file_path, 'w') as file:
-        json.dump(data, file, indent=2)
+    d = f"{user_data['timestamp']} - {user_data['user_name']} {user_data['username']}: {user_data['format']} - {user_data['url']} \n"
+    print(d)
+    with open('user_data.txt', 'a', encoding='utf8') as f:
+        f.write(d)
 
 
 async def send_file(audio, author, thumbnail, update):
@@ -140,8 +121,15 @@ async def get_url(update: Update, context: CallbackContext) -> None:
 async def reply_to_user(update):
     message = update.message.text
     response = get_response(message)
-    print(f'{update.effective_user.username} {update.effective_user.first_name} {update.effective_user.last_name}:  {message} - {response}' )
+    log_message = f'{update.effective_user.username} {update.effective_user.first_name} {update.effective_user.last_name}:  "{message} - {response}" {datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")}'
+    
+    print(log_message)
+    with open('conversation.txt', 'a', encoding='utf8') as f:
+        f.write(log_message + '\n')
+
+    
     await update.message.reply_text(response)
+
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
