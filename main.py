@@ -17,6 +17,7 @@ from telegram.ext import (filters,
                           CommandHandler, 
                           CallbackContext, 
                           CallbackQueryHandler)
+from response_to_user.chatbot import get_response
 
 
 load_dotenv()
@@ -99,16 +100,16 @@ async def send_file(audio, author, thumbnail, update):
                                           thumbnail=thumbnail, performer=author)
                 photo.close()
             file.close()
-
-        remove_files(video, thumbnail, audio)
-        
+        print(video + "__________________")
+        remove_files(video, thumbnail, audio)    
+    
     else:
-        with open(audio, 'rb') as file:
+        with open(audio, 'rb') as file: 
             with open(thumbnail, 'rb') as photo:
                 await update.callback_query.message.reply_video(video=file, filename=clean_filename)
                 photo.close()
             file.close()
-        
+
         remove_files(video, thumbnail, audio)
 
 
@@ -134,12 +135,17 @@ async def get_url(update: Update, context: CallbackContext) -> None:
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text('Будь ласка, виберіть формат:', reply_markup=reply_markup)
     else:
-        await update.message.reply_text('Ти впевнений, що це правильне посилання?')
+        await reply_to_user(update)
+
+async def reply_to_user(update):
+    message = update.message.text
+    response = get_response(message)
+    print(f'{update.effective_user.username} {update.effective_user.first_name} {update.effective_user.last_name}:  {message} - {response}' )
+    await update.message.reply_text(response)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Use /start to test this bot.")
-
 
 
 if __name__ == "__main__":
