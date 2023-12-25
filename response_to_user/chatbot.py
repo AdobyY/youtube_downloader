@@ -45,22 +45,29 @@ def predict_class(sentence):
 
 
 def get_response(message):
-    intents_list = predict_class(message)
-    tag = intents_list[0]['intent']
-    list_of_intents = intents['intents']
-    for i in list_of_intents:
-        if i['tag'] == tag:
-            result = random.choice(i['responses'])
-    return result
+    if message.lower() in message_dict:
+        return message_dict[message.lower()]
+    else:
+        intents_list = predict_class(message)
+        tag = intents_list[0]['intent']
+        list_of_intents = intents['intents']
+        for i in list_of_intents:
+            if i['tag'] == tag:
+                result = random.choice(i['responses'])
+        return result
 
 
 print('GOOOO')
 
-# while True:
-#     message = input('')
-#     ints = predict_class(message)
-#     res = get_response(ints)
-#     print(res)
+message_dict = {
+    'математика': 'Ось, повчи трошки - https://waytomathematics.blogspot.com/p/zno.html',
+    'секрет': 'Хочеш дізнатись таємницю всіх часів і народів? Розгадай наступну загадку - "Гірше робити аномалію. Вірити. Більше інші сніжитиммуть епоксидною красою річки"',
+    'гра в бісер': 'А ти крутий, ось подарунок - https://www.youtube.com/watch?v=PcawW1eO-KY',
+    'вона носила квіти у волоссі': 'І ними грався ві та ще й вітер',
+    'здавалося давно вже дорослі': 'Але кохали щиро, мов діти',
+    '1984': 'Старший брат стежить за тобою',
+    'ключ': 'Незабаром щось придумаю'
+}
 
 
 
