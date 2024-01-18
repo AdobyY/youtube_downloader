@@ -1,2 +1,7 @@
 .env
 venv
+conversation.txt
+user_data.txt
+response_to_user/intents.json
+response_to_user/message.py
+*/__pycache__

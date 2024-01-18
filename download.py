@@ -19,7 +19,7 @@ async def download(update, context):
         global progress_message
         global last_message_text
         progress_text = "Завантаження..."
-        
+
 
         if d['status'] == 'downloading':
             percent_str = re.sub(r'\x1b\[[0-9;]*m', '', d['_percent_str'])
@@ -44,7 +44,7 @@ async def download(update, context):
         # else:
         #     asyncio.get_event_loop().create_task(context.bot.send_message(chat_id=context.user_data.get('chat_id'),
         #                             text="Зараз буде"))
-        
+
     await update.callback_query.edit_message_text(text="Знайшов, завантажую...")
     with YoutubeDL() as ydl:
         info_dict = ydl.extract_info(url, download=True)
@@ -58,8 +58,8 @@ async def download(update, context):
             return audio_filename, author, thumbnail_picture
 
         return filename, author, thumbnail_picture 
-    
-    
+
+
 def download_thumbnail(url):
     yt = YouTube(url)
     thumbnail_url = yt.thumbnail_url
@@ -69,7 +69,7 @@ def download_thumbnail(url):
     response = requests.get(thumbnail_url)
     with open(f'{filename}.jpg', 'wb') as file:
         file.write(response.content)
-        
+
     return f'{filename}.jpg'
 
 
